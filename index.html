@@ -39,15 +39,24 @@ input{font:inherit;width:100%;padding:13px 14px;border-radius:14px;border:2px so
 <body>
 <div id="app"><p>Loading…</p></div>
 <script type="module">
-import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,signInAnonymously} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,doc,collection,getDoc,setDoc,updateDoc,deleteDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeApp} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+import {getAuth,signInAnonymously} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+import {getAI,getGenerativeModel,GoogleAIBackend} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-ai.js";
+import {initializeAppCheck,ReCaptchaV3Provider} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app-check.js";
+import {getFirestore,serverTimestamp,doc,collection,getDoc,setDoc,updateDoc,deleteDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 const app=initializeApp({apiKey:"AIzaSyDHcp44KXR6Gax_Vf3fwdinWBgJB4l_92Y",authDomain:"clue-rush-a7bbe.firebaseapp.com",projectId:"clue-rush-a7bbe",storageBucket:"clue-rush-a7bbe.firebasestorage.app",messagingSenderId:"439710542707",appId:"1:439710542707:web:b55e0a8f2c309b86e8b306"});
 const auth=getAuth(app),fs=getFirestore(app);
-const snap=s=>({exists:s.exists(),data:()=>s.data()});
+const SITE_KEY="PASTE_SITE_KEY_HERE",MODEL="gemini-3-flash-preview";
+let model=null;
+try{
+  if(!SITE_KEY.startsWith("PASTE"))initializeAppCheck(app,{provider:new ReCaptchaV3Provider(SITE_KEY),isTokenAutoRefreshEnabled:true});
+  model=getGenerativeModel(getAI(app,{backend:new GoogleAIBackend()}),{model:MODEL});
+}catch(e){}
+const askAI=async p=>{if(!model)return null;try{const r=await Promise.race([model.generateContent(p),new Promise((_,j)=>setTimeout(j,15000))]);return r.response.text().trim()}catch(e){return null}};
+const snap=s=>({exists:s.exists(),data:()=>s.data({serverTimestamps:"estimate"})});
 const makeDb=()=>({
   doc:p=>{const r=doc(fs,p);return{get:async()=>snap(await getDoc(r)),set:d=>setDoc(r,d),update:d=>updateDoc(r,d),delete:()=>deleteDoc(r),onSnapshot:cb=>onSnapshot(r,x=>cb(snap(x)))}},
-  collection:p=>({onSnapshot:cb=>onSnapshot(collection(fs,p),q=>cb({docs:q.docs.map(d=>({id:d.id,data:()=>d.data()}))}))})
+  collection:p=>({onSnapshot:cb=>onSnapshot(collection(fs,p),q=>cb({docs:q.docs.map(d=>({id:d.id,data:()=>({...d.data({serverTimestamps:"estimate"}),_p:d.metadata.hasPendingWrites})}))}))})
 });
 const FB="Coffee/Tea,Pizza/Burger,Cat/Dog,Beach/Pool,Guitar/Violin,Train/Bus,Apple/Pear,Sun/Moon,Doctor/Nurse,Lion/Tiger,Pen/Pencil,Rain/Snow,Car/Motorbike,Milk/Yogurt,Hotel/Hostel,Shark/Dolphin,Soup/Stew,Laptop/Tablet,River/Lake,Bread/Cake,Wolf/Fox,Mango/Banana,Tent/Cabin,Rose/Tulip,Whale/Seal,Castle/Palace,Wallet/Purse,Bakery/Cafe,Jacket/Coat,Desert/Savanna,Candle/Lamp,Truck/Van,Honey/Jam,Sandwich/Wrap,Gold/Silver,Violin/Cello,Tomato/Potato,Boat/Ship,Chess/Checkers,Sword/Dagger,Cinema/Theatre,Pancake/Waffle,Comet/Meteor,Owl/Eagle,Bridge/Tunnel,Football/Cricket,Muffin/Cupcake,Scarf/Shawl,Tractor/Bulldozer,Island/Peninsula,Poet/Author,Camel/Llama,Ice cream/Frozen yogurt,Hammer/Mallet,Oven/Microwave,Spoon/Fork,Sofa/Chair".split(",").map(s=>s.split("/"));
 const THEMES="food,animals,sports,jobs,travel,home,school,music,nature,tech,clothes,drinks,transport,movies,games,weather,tools,fruit,places".split(",");
@@ -62,17 +71,74 @@ const nm=i=>(P[i]&&P[i].name)||"Player";
 const rdoc=()=>db.doc("rooms/"+code);
 const me=()=>db.doc(`rooms/${code}/players/${uid}`);
 const key=()=>R.game+"_"+R.round;
+let off=0;
+const sNow=()=>Date.now()+off;
+const tsms=v=>v&&v.toMillis?v.toMillis():(v||0);
+function lead(){
+  const ids=Object.keys(P).filter(i=>!P[i].bot),m=Math.max(0,...ids.map(i=>tsms(P[i].seen)));
+  return ids.filter(i=>m-tsms(P[i].seen)<25000).sort()[0]||R.host;
+}
+const isLead=()=>lead()===uid;
+setInterval(()=>{if(code&&db&&uid)me().update({seen:serverTimestamp()}).catch(()=>{})},8000);
 let chat=[],cdraft="";
+const H={};"Coffee|hot dark morning drink|subah ki garam kaali cheez;Tea|hot drink often with milk|dudh wali garam cheez;Pizza|round with cheese on top|gol hota hai, upar cheese;Burger|bun with a patty inside|bun ke andar tikki hoti hai;Cat|says meow|ye meow karti hai;Dog|loyal and barks|wafadar hai aur bhonkta hai;Beach|sand and waves|ret aur lehrein;Pool|water you swim in|isme tairte hain;Guitar|strings you strum|taaron wala, ungliyon se bajta hai;Violin|played with a bow|kamaan se bajta hai;Train|runs on tracks|patriyon par chalti hai;Bus|carries many people on roads|sadak par bohat sawariyan;Apple|red or green fruit|laal ya hara phal;Pear|green fruit wider at the bottom|neeche se mota phal;Sun|gives light in the daytime|din mein roshni deta hai;Moon|shines at night|raat ko chamakta hai;Doctor|checks patients|mareez ko check karta hai;Nurse|cares for patients in hospital|hospital mein dekhbhal karti hai;Lion|king of the jungle|jungle ka badshah;Tiger|big cat with stripes|dhaariyon wala bada janwar;Pen|you write with ink|isse likhte hain;Pencil|you write and erase|likhte hain aur mita sakte hain;Rain|water falling from clouds|badal se paani girta hai;Snow|white and cold|safed aur thandi;Car|four wheels and an engine|chaar pahiye aur engine;Motorbike|two wheels and an engine|do pahiye aur engine;Milk|white drink from cows|safed cheez, gai se milti hai;Yogurt|thick and sour|gaadha aur khatta;Hotel|stay overnight and pay|raat guzarne ki jagah;Hostel|cheap shared rooms|saste, mil kar rehne wale kamre;Shark|dangerous sea hunter|samandar ka khatarnak shikari;Dolphin|smart sea animal that jumps|samandar ka samajhdar janwar;Soup|hot liquid in a bowl|piyale mein garam patla;Stew|thick slow-cooked dish|dheemi aanch par pakta gaadha saalan;Laptop|portable computer|uthane wala computer;Tablet|touch screen bigger than a phone|phone se bada touch screen;River|flowing water|behta hua paani;Lake|still water surrounded by land|tehra hua paani;Bread|baked slices|sek kar bani, slice mein;Cake|sweet thing for birthdays|salgirah par meetha;Wolf|howls at night|raat ko chilata hai;Fox|clever and orange|chalak aur narangi;Mango|king of fruits|phalon ka badshah;Banana|yellow peel|peele chhilke wala;Spoon|used for soup|soup ya chawal khane ke liye;Fork|has prongs|nokdaar kante wala;Sofa|seat for several people|kai logon ke liye baithak;Chair|seat for one person|ek banda baithta hai;Tent|camping shelter|camping mein kapde ka ghar;Cabin|small wooden house|lakdi ka chhota ghar;Rose|flower with thorns|kaante wala phool;Tulip|cup shaped spring flower|bahar ka pyala numa phool;Whale|biggest sea animal|samandar ka sab se bada janwar;Seal|swims and balances balls|tairta hai, gend ghumata hai;Castle|old fortress for kings|badshahon ka purana qila;Palace|royal home|shahi ghar;Wallet|keeps cash and cards|paise aur cards rakhte hain;Purse|small bag for money|paison ka chhota thaila;Bakery|shop for bread and cakes|bread aur cake ki dukaan;Cafe|place for coffee and snacks|coffee aur snacks ki jagah;Jacket|short outer clothing|chhota upar pehnne wala kapda;Coat|long warm outer clothing|lamba garam kapda;Desert|hot dry sand|garam khushk ret;Savanna|grassland with wild animals|ghaas ka maidan, jungli janwar;Candle|wax and a flame|moom aur lau;Lamp|light on a table|mez par roshni;Truck|carries heavy goods|bhaari saman uthata hai;Van|small vehicle for a group|chhoti gaari, kai log;Honey|made by bees|makkhiyan banati hain;Jam|fruit spread for bread|bread par lagane wala phal;Sandwich|between two slices|do slices ke beech;Wrap|rolled in flatbread|roti mein lipta hua;Gold|yellow precious metal|peela qeemti dhaat;Silver|white shiny metal|chamakdaar safed dhaat;Cello|big string instrument held between knees|ghutno ke beech bada saaz;Tomato|red and juicy in salads|laal rasila, salad mein;Potato|grows underground and gets fried|zameen ke neeche ugta hai;Boat|small vessel on water|paani par chhoti sawari;Ship|huge vessel crossing seas|samandar paar karne wali bohat badi cheez;Chess|king and queen board game|badshah wazir ka khel;Checkers|round pieces on a board|gol goti wala board game;Sword|long blade|lambi dhaar wali;Dagger|short blade|chhoti dhaar wali;Cinema|big screen with popcorn|bari screen aur popcorn;Theatre|live stage show|stage par live show;Pancake|flat breakfast with syrup|naashte mein chapta, syrup;Waffle|grid pattern breakfast|khanon wala naashta;Comet|icy space rock with a tail|dum wala khalai pathar;Meteor|burning rock falling|jalta hua girta pathar;Owl|night bird with big eyes|raat ka parinda, bari aankhein;Eagle|big bird of prey|shikari bada parinda;Bridge|crosses a river|nadi ke upar guzarta hai;Tunnel|passage through a mountain|pahaar ke andar se rasta;Football|kicked to score goals|laat se maarte hain, goal;Cricket|bat and ball with wickets|balla aur wicket;Muffin|small baked cake|chhota baked keik jaisa;Cupcake|tiny cake with icing|chhota keik, upar cream;Scarf|worn around the neck|gardan par lete hain;Shawl|wrapped over shoulders|kandhon par odhte hain;Tractor|farm vehicle|khet ki gaari;Bulldozer|pushes earth at construction sites|mitti dhakelti hai;Island|land surrounded by water|charon taraf paani wali zameen;Peninsula|land with water on three sides|teen taraf paani wali zameen;Poet|writes verses|shairi likhta hai;Author|writes books|kitaabein likhta hai;Camel|desert animal with a hump|registan ka janwar, kohaan;Llama|woolly mountain animal|oon wala pahari janwar;Ice cream|cold sweet scoop|thandi meethi scoop;Frozen yogurt|cold tangy dessert|thandi khatti meethi;Hammer|hits nails|keel thokta hai;Mallet|wooden head tool for gentle hitting|lakdi ka naram maarne wala;Oven|bakes food|khana sek kar pakata hai;Microwave|heats food fast|khana jaldi garam karta hai".split(";").forEach(l=>{const[w,e,u]=l.split("|");H[w.toLowerCase()]=[e,u]});
+const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
+let botK="",bv={};
+const isBot=i=>!!(P[i]&&P[i].bot);
+const LINES=["Hmm, kiska hint thoda ajeeb tha?","Someone’s hint felt a bit off to me.","Hints ko dhyan se dekho, koi vague hai.","Who was the most vague one?"];
+const CHATQ="\nWrite your next chat message: one short casual sentence (max 20 words), like a friend texting. Match the language the other players use (English or Roman Urdu); if nobody has spoken, mix Roman Urdu and English. Never say you are an AI. Output only the message.";
+function botStep(){
+  const k=key();
+  if(R.phase==="hints"){
+    const b=R.order[R.turn];
+    if(!isBot(b)||P[b]["h"+k]!==undefined)return;
+    const bk=k+"_"+R.turn;if(bk===botK)return;botK=bk;
+    const w=R.imp===b?R.impw:R.civ,h=H[String(w).toLowerCase()],t=h?h[(R.round+R.game+R.turn)%2]:"I can’t say much about it";
+    setTimeout(()=>db.doc(`rooms/${code}/players/${b}`).update({["h"+k]:cap(t)}).catch(()=>{}),3000);
+  }else if(R.phase==="vote")R.order.filter(isBot).forEach(b=>botVote(b,k));
+}
+const nmb=(i,b)=>i===b?`${nm(i)} (you)`:nm(i);
+function ctx(b){
+  const k=key(),isImp=R.imp===b,w=isImp?R.impw:R.civ;
+  const hs=R.order.map(i=>{const l=[];for(let r=1;r<=R.round;r++){const t=P[i]&&P[i]["h"+R.game+"_"+r];if(t!==undefined)l.push(`round ${r}: "${t}"`)}return `${nmb(i,b)}: ${l.join("; ")}`}).join("\n");
+  const ch=chat.filter(x=>x.k===k).map(x=>`${nmb(x.u,b)}: ${x.m}`).join("\n")||"(nobody has spoken yet)";
+  const role=isImp?`You are the IMPOSTER. Your word is "${w}", but the others have a similar, different word. Blend in, never reveal you are the imposter, never say your word outright, and subtly cast suspicion on another player.`:`You are a CREW member. Your word is "${w}". One player has a similar but different word. Work out who from their hints and the chat.`;
+  return `You are ${nm(b)}, a player in a word imposter party game with friends. ${role}\nPlayers: ${R.order.map(i=>nmb(i,b)).join(", ")}. Some players are robots.\nHints so far:\n${hs}\nChat so far:\n${ch}`;
+}
+async function botVote(b,k){
+  if(P[b]["v"+k]!==undefined)return;
+  const now=Date.now();let s=bv[b];
+  if(!s||s.k!==k)s=bv[b]={k,sent:0,seen:0,next:now+9000+Math.random()*9000,last:0,busy:false};
+  if(s.busy)return;
+  const humans=R.order.filter(i=>!isBot(i)),done=humans.every(i=>P[i]&&P[i]["v"+k]!==undefined);
+  if(done||(R.deadline&&R.deadline-sNow()<25000)){s.busy=true;return castVote(b,k)}
+  const msgs=chat.filter(x=>x.k===k&&x.u!==b).length;
+  if(s.sent<4&&now>=s.next&&(msgs>s.seen||s.sent===0||now-s.last>40000)){
+    s.busy=true;s.seen=msgs;
+    const t=((await askAI(ctx(b)+CHATQ))||pick(LINES)).replace(/^"|"$/g,"").slice(0,120);
+    if(code&&R&&R.phase==="vote"&&key()===k)await db.doc(`rooms/${code}/chat/${Date.now()}_${b}`).set({u:b,m:t,t:Date.now(),k}).catch(()=>{});
+    s.sent++;s.last=Date.now();s.next=s.last+8000+Math.random()*8000;s.busy=false;
+  }
+}
+async function castVote(b,k){
+  const isImp=R.imp===b,others=R.order.filter(i=>i!==b),byLen=[...others].sort((x,y)=>nm(y).length-nm(x).length);
+  const a=await askAI(ctx(b)+`\nWho do you think is the imposter? Reply with only one player's exact name from: ${others.map(nm).join(", ")}.${isImp?" You must pick someone other than yourself.":" Reply SKIP only if you really can't tell."}`);
+  let v=a&&byLen.find(i=>a.toLowerCase().includes(nm(i).toLowerCase()));
+  if(!v)v=(a&&!isImp&&/skip/i.test(a))?"skip":pick(others);
+  db.doc(`rooms/${code}/players/${b}`).update({["v"+k]:v}).catch(()=>{});
+}
+setInterval(()=>{if(R&&code&&isLead()&&R.phase==="vote")botStep()},2500);
+
 function chatUI(){const m=chat.filter(x=>x.k===key());return `<div class="rd"><p>Chat</p>${m.map(x=>`<div class="hl"><b>${esc(nm(x.u))}</b><span>${esc(x.m)}</span></div>`).join("")}<div style="display:flex;gap:8px"><input id="cdraft" placeholder="Say something…" maxlength="120" value="${esc(cdraft)}" autocomplete="off"><button data-act="chat">Send</button></div></div>`}
 const HINT_MS=90000,VOTE_MS=120000;
-const left=()=>R&&R.deadline?Math.max(0,Math.ceil((R.deadline-Date.now())/1000)):0;
+const left=()=>R&&R.deadline?Math.max(0,Math.ceil((R.deadline-sNow())/1000)):0;
 const fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
 const timer=()=>`<p class="tm">Time left <b id="tm">${fmt(left())}</b></p>`;
 let timeoutKey="";
 setInterval(()=>{
   if(!R||!code||(R.phase!=="hints"&&R.phase!=="vote"))return;
   const el=document.getElementById("tm");if(el)el.textContent=fmt(left());
-  if(R.host===uid&&R.deadline&&Date.now()>R.deadline+500){
+  if(isLead()&&R.deadline&&sNow()>R.deadline+500){
     const k=key(),tk=[k,R.phase,R.turn].join();
     if(tk===timeoutKey)return;timeoutKey=tk;
     if(R.phase==="hints")db.doc(`rooms/${code}/players/${R.order[R.turn]}`).update({["h"+k]:"(no hint)"}).catch(()=>{});
@@ -110,14 +176,14 @@ async function join(c,quiet){
     const s=await db.doc("rooms/"+c).get();
     if(!s.exists){if(quiet)ls.set("imp-code","");else fail("Room not found. Check the code.");return}
     const pd=db.doc(`rooms/${c}/players/${uid}`),ps=await pd.get();
-    if(ps.exists)await pd.update({name:name.trim().slice(0,16)});else await pd.set({name:name.trim().slice(0,16),at:Date.now()});
+    if(ps.exists)await pd.update({name:name.trim().slice(0,16),seen:serverTimestamp()});else await pd.set({name:name.trim().slice(0,16),at:Date.now(),seen:serverTimestamp()});
     ls.set("imp-name",name.trim());ls.set("imp-code",c);code=c;err="";subscribe();
   }catch(e){fail("Could not join the room.")}
 }
 function subscribe(){
   unsubs.push(db.collection(`rooms/${code}/chat`).onSnapshot(q=>{chat=q.docs.map(d=>d.data()).sort((a,b)=>a.t-b.t);tick()}));
   unsubs.push(rdoc().onSnapshot(s=>{R=s.exists?s.data():null;tick()}));
-  unsubs.push(db.collection(`rooms/${code}/players`).onSnapshot(q=>{P={};q.docs.forEach(d=>P[d.id]=d.data());tick()}));
+  unsubs.push(db.collection(`rooms/${code}/players`).onSnapshot(q=>{P={};q.docs.forEach(d=>P[d.id]=d.data());const m=P[uid];if(m&&m.seen&&!m._p)off=tsms(m.seen)-Date.now();tick()}));
 }
 function leave(){
   unsubs.forEach(u=>u());unsubs=[];
@@ -126,19 +192,19 @@ function leave(){
 }
 function fail(m){err=m;render()}
 
-function tick(){if(R&&R.host===uid)hostStep();render()}
+function tick(){if(R&&isLead()){hostStep();botStep()}render()}
 function hostStep(){
   const k=key(),kk=[k,R.phase,R.turn].join();
   if(kk===lastKey)return;
   if(R.phase==="hints"){
     const c=R.order[R.turn];
-    if(P[c]&&P[c]["h"+k]!==undefined){lastKey=kk;rdoc().update(R.turn+1<R.order.length?{turn:R.turn+1,deadline:Date.now()+HINT_MS}:{phase:"vote",deadline:Date.now()+VOTE_MS})}
+    if(P[c]&&P[c]["h"+k]!==undefined){lastKey=kk;rdoc().update(R.turn+1<R.order.length?{turn:R.turn+1,deadline:sNow()+HINT_MS}:{phase:"vote",deadline:sNow()+VOTE_MS})}
   }else if(R.phase==="vote"&&R.order.every(i=>P[i]&&P[i]["v"+k]!==undefined)){
     lastKey=kk;
     const c={};let skip=0;
     R.order.forEach(i=>{const v=P[i]["v"+k];if(v==="skip")skip++;else c[v]=(c[v]||0)+1});
     const top=Object.entries(c).sort((a,b)=>b[1]-a[1]),[tid,tn]=top[0]||[];
-    if(!tid||skip>=tn||(top[1]&&top[1][1]===tn))rdoc().update({round:R.round+1,turn:0,phase:"hints",deadline:Date.now()+HINT_MS,note:"No majority, so the vote was skipped. Give another hint."});
+    if(!tid||skip>=tn||(top[1]&&top[1][1]===tn))rdoc().update({round:R.round+1,turn:0,phase:"hints",deadline:sNow()+HINT_MS,note:"No majority, so the vote was skipped. Give another hint."});
     else rdoc().update({phase:"result",accused:tid,winner:tid===R.imp?"crew":"imposter"});
   }
 }
@@ -146,7 +212,7 @@ async function startGame(){
   const ids=Object.keys(P);if(ids.length<3||starting)return;
   starting=true;render();
   const pair=await makePair();
-  await rdoc().update({phase:"hints",deadline:Date.now()+HINT_MS,game:R.game+1,round:1,turn:0,order:shuffle(ids),imp:pick(ids),civ:pair[0],impw:pair[1],used:[...(R.used||[]).slice(-40),pair.join("/")],note:"",accused:"",winner:""});
+  await rdoc().update({phase:"hints",deadline:sNow()+HINT_MS,game:R.game+1,round:1,turn:0,order:shuffle(ids),imp:pick(ids),civ:pair[0],impw:pair[1],used:[...(R.used||[]).slice(-40),pair.join("/")],note:"",accused:"",winner:""});
   starting=false;
 }
 
@@ -176,10 +242,10 @@ function body(){
   <button class="main" data-act="create">Create room</button>
   <input id="codein" placeholder="Room code" maxlength="4" value="${esc(codeIn)}" autocomplete="off" autocapitalize="characters">
   <button class="ghost" data-act="join">Join room</button>${e}`;
-  const ids=Object.keys(P).sort((a,b)=>P[a].at-P[b].at),isHost=R.host===uid,out=`<button class="ghost" data-act="leave">Leave room</button>`;
+  const ids=Object.keys(P).sort((a,b)=>P[a].at-P[b].at),isHost=isLead(),out=`<button class="ghost" data-act="leave">Leave room</button>`;
   if(R.phase==="lobby")return `<div class="card"><p>Room code</p><div class="code">${code}</div><p>Friends open the same link and join with this code.</p></div>
   <div class="list">${ids.map(i=>`<div class="pl"><b>${esc(nm(i))}${i===uid?" (you)":""}</b>${isHost&&i!==uid?`<button class="ghost x" data-act="kick" data-id="${i}" aria-label="Remove ${esc(nm(i))}">Remove</button>`:""}</div>`).join("")}</div>
-  <div class="spacer"></div>${isHost?`<button class="main" data-act="start" ${ids.length<3||starting?"disabled":""}>${starting?"Picking words…":ids.length<3?"Need 3 players to start":"Start game"}</button>`:`<p>Waiting for ${esc(nm(R.host))} to start.</p>`}${e}${out}`;
+  <div class="spacer"></div>${isHost?`<div style="display:flex;gap:8px"><button class="ghost" data-act="addbot" style="flex:1">Add robot 🤖</button>${ids.some(i=>P[i].bot)?`<button class="ghost" data-act="rmbot" style="flex:1">Remove robot</button>`:""}</div><button class="main" data-act="start" ${ids.length<3||starting?"disabled":""}>${starting?"Picking words…":ids.length<3?"Need 3 players to start":"Start game"}</button>`:`<p>Waiting for ${esc(nm(lead()))} to start.</p>`}${e}${out}`;
   const inGame=R.order.includes(uid),k=key();
   if(!inGame)return `<div class="card"><p>A game is in progress</p><div class="big">You’ll join the next one</div></div>${out}`;
   if(R.phase==="hints"){
@@ -195,7 +261,7 @@ function body(){
   const won=R.winner==="crew";
   return `<div class="card ${won?"word":"imp"}"><p>${won?"Crew wins":"Imposter wins"}</p><div class="big">${esc(nm(R.accused))} was voted out</div><p>${won?"They were the imposter.":`The real imposter was ${esc(nm(R.imp))}.`}</p></div>
   <div class="hl"><b>Everyone else</b><span>${esc(R.civ)}</span></div><div class="hl"><b>Imposter</b><span>${esc(R.impw)}</span></div>
-  <div class="spacer"></div>${isHost?`<button class="main" data-act="start" ${starting?"disabled":""}>${starting?"Picking words…":"Play again"}</button>`:`<p>Waiting for ${esc(nm(R.host))} to start the next game.</p>`}${out}`;
+  <div class="spacer"></div>${isHost?`<button class="main" data-act="start" ${starting?"disabled":""}>${starting?"Picking words…":"Play again"}</button>`:`<p>Waiting for ${esc(nm(lead()))} to start the next game.</p>`}${out}`;
 }
 
 $.addEventListener("click",async ev=>{
@@ -208,6 +274,8 @@ $.addEventListener("click",async ev=>{
     else if(a==="kick")db.doc(`rooms/${code}/players/${b.dataset.id}`).delete();
     else if(a==="hint"){const t=draft.trim();if(!t)return;draft="";await me().update({["h"+key()]:t.slice(0,40)})}
     else if(a==="chat"){const t=cdraft.trim();if(!t)return;cdraft="";await db.doc(`rooms/${code}/chat/${Date.now()}_${uid}`).set({u:uid,m:t.slice(0,120),t:Date.now(),k:key()})}
+    else if(a==="addbot"){const ks=Object.keys(P);let n=1;while(P["robot"+n])n++;if(n<=6&&ks.length<12)await db.doc(`rooms/${code}/players/robot${n}`).set({name:`Robot ${n}`,bot:true,at:Date.now()})}
+    else if(a==="rmbot"){const bs=Object.keys(P).filter(i=>P[i].bot).sort();if(bs.length)await db.doc(`rooms/${code}/players/${bs[bs.length-1]}`).delete()}
     else if(a==="vote")await me().update({["v"+key()]:b.dataset.id});
   }catch(e){fail("That didn’t go through. Try again.")}
 });
