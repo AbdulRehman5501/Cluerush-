@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Imposter Online</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F3EFFF;--ink:#1E1B3A;--card:#FFFFFF;--muted:#6B6890;--pink:#FF5C7A;--sun:#FFC93C;--line:#D9D3F5;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17152B;--ink:#F1EEFF;--card:#25223F;--muted:#A19DC9;--line:#3A3660;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17152B;--ink:#F1EEFF;--card:#25223F;--muted:#A19DC9;--line:#3A3660;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:500;line-height:1.4}
+#app{max-width:480px;margin:0 auto;padding:20px 20px 32px;min-height:100dvh;display:flex;flex-direction:column;gap:14px}
+h1{font-size:3.2rem;line-height:.95;margin:12px 0 0;font-weight:800;letter-spacing:-.03em}
+p{margin:0;color:var(--muted)}
+button{font:inherit;font-weight:700;border:0;border-radius:16px;padding:14px 18px;background:var(--ink);color:var(--bg);cursor:pointer;min-height:50px}
+button:disabled{opacity:.4}
+button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+button.main{background:var(--pink);color:#fff;font-size:1.1rem;width:100%}
+button.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+input{font:inherit;width:100%;padding:13px 14px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink)}
+.card{background:var(--card);border-radius:24px;padding:22px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+.card.word{background:var(--sun);color:#1E1B3A}.card.word p{color:#1E1B3A}
+.card.imp{background:var(--pink);color:#fff}.card.imp p{color:#fff}
+.big{font-size:2.4rem;font-weight:800;line-height:1.05;letter-spacing:-.02em;word-wrap:break-word;max-width:100%}
+.code{font-size:3rem;font-weight:800;letter-spacing:.18em}
+.list{display:grid;gap:8px;width:100%}
+.hl,.pl{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);border-radius:14px;padding:11px 14px;text-align:left}
+.hl span{color:var(--muted);text-align:right}
+.rd{display:grid;gap:6px}
+.spacer{flex:1}
+.err{color:var(--pink);font-weight:700}
+.x{min-height:36px;padding:4px 12px}
+.tm{text-align:center;font-size:1.1rem}.tm b{font-size:1.6rem;color:var(--pink)}
+</style>
+</head>
+<body>
+<div id="app"><p>Loading…</p></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,signInAnonymously} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,doc,collection,getDoc,setDoc,updateDoc,deleteDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const app=initializeApp({apiKey:"AIzaSyDHcp44KXR6Gax_Vf3fwdinWBgJB4l_92Y",authDomain:"clue-rush-a7bbe.firebaseapp.com",projectId:"clue-rush-a7bbe",storageBucket:"clue-rush-a7bbe.firebasestorage.app",messagingSenderId:"439710542707",appId:"1:439710542707:web:b55e0a8f2c309b86e8b306"});
+const auth=getAuth(app),fs=getFirestore(app);
+const snap=s=>({exists:s.exists(),data:()=>s.data()});
+const makeDb=()=>({
+  doc:p=>{const r=doc(fs,p);return{get:async()=>snap(await getDoc(r)),set:d=>setDoc(r,d),update:d=>updateDoc(r,d),delete:()=>deleteDoc(r),onSnapshot:cb=>onSnapshot(r,x=>cb(snap(x)))}},
+  collection:p=>({onSnapshot:cb=>onSnapshot(collection(fs,p),q=>cb({docs:q.docs.map(d=>({id:d.id,data:()=>d.data()}))}))})
+});
+const FB="Coffee/Tea,Pizza/Burger,Cat/Dog,Beach/Pool,Guitar/Violin,Train/Bus,Apple/Pear,Sun/Moon,Doctor/Nurse,Lion/Tiger,Pen/Pencil,Rain/Snow,Car/Motorbike,Milk/Yogurt,Hotel/Hostel,Shark/Dolphin,Soup/Stew,Laptop/Tablet,River/Lake,Bread/Cake,Wolf/Fox,Mango/Banana,Tent/Cabin,Rose/Tulip,Whale/Seal,Castle/Palace,Wallet/Purse,Bakery/Cafe,Jacket/Coat,Desert/Savanna,Candle/Lamp,Truck/Van,Honey/Jam,Sandwich/Wrap,Gold/Silver,Violin/Cello,Tomato/Potato,Boat/Ship,Chess/Checkers,Sword/Dagger,Cinema/Theatre,Pancake/Waffle,Comet/Meteor,Owl/Eagle,Bridge/Tunnel,Football/Cricket,Muffin/Cupcake,Scarf/Shawl,Tractor/Bulldozer,Island/Peninsula,Poet/Author,Camel/Llama,Ice cream/Frozen yogurt,Hammer/Mallet,Oven/Microwave,Spoon/Fork,Sofa/Chair".split(",").map(s=>s.split("/"));
+const THEMES="food,animals,sports,jobs,travel,home,school,music,nature,tech,clothes,drinks,transport,movies,games,weather,tools,fruit,places".split(",");
+const $=document.getElementById("app");
+let db,user,sample,uid,code=null,R=null,P={},unsubs=[],ready=false,err="",lastKey="",draft="",codeIn="",starting=false;
+const ls={get:k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+let name=ls.get("imp-name");
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const nm=i=>(P[i]&&P[i].name)||"Player";
+const rdoc=()=>db.doc("rooms/"+code);
+const me=()=>db.doc(`rooms/${code}/players/${uid}`);
+const key=()=>R.game+"_"+R.round;
+const HINT_MS=90000,VOTE_MS=120000;
+const left=()=>R&&R.deadline?Math.max(0,Math.ceil((R.deadline-Date.now())/1000)):0;
+const fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+const timer=()=>`<p class="tm">Time left <b id="tm">${fmt(left())}</b></p>`;
+let timeoutKey="";
+setInterval(()=>{
+  if(!R||!code||(R.phase!=="hints"&&R.phase!=="vote"))return;
+  const el=document.getElementById("tm");if(el)el.textContent=fmt(left());
+  if(R.host===uid&&R.deadline&&Date.now()>R.deadline+500){
+    const k=key(),tk=[k,R.phase,R.turn].join();
+    if(tk===timeoutKey)return;timeoutKey=tk;
+    if(R.phase==="hints")db.doc(`rooms/${code}/players/${R.order[R.turn]}`).update({["h"+k]:"(no hint)"}).catch(()=>{});
+    else R.order.forEach(i=>{if(!(P[i]&&P[i]["v"+k]!==undefined))db.doc(`rooms/${code}/players/${i}`).update({["v"+k]:"skip"}).catch(()=>{})});
+  }
+},1000);
+
+(async()=>{
+  try{
+    const cred=await signInAnonymously(auth);uid=cred.user.uid;db=makeDb();ready=true;
+  }catch(e){}
+  render();
+  const c=ls.get("imp-code");if(ready&&c&&name)join(c,true);
+})();
+
+async function makePair(){
+  if(sample){try{
+    const v=await sample.json(`Pick two different but very similar everyday words (or short phrases) for a party word game, like Coffee and Tea. Theme: ${pick(THEMES)}. Do not use these pairs: ${(R.used||[]).join(", ")||"none"}. Reply only as JSON: {"a":"word","b":"word"}`,{modelTier:"quick",cache:false});
+    const a=String(v&&v.a||"").trim().slice(0,24),b=String(v&&v.b||"").trim().slice(0,24);
+    if(a&&b&&a.toLowerCase()!==b.toLowerCase())return Math.random()<.5?[a,b]:[b,a];
+  }catch(e){}}
+  let p,n=0;do{p=pick(FB);n++}while((R.used||[]).includes(p.join("/"))&&n<50);
+  return Math.random()<.5?p:[p[1],p[0]];
+}
+
+async function create(){
+  if(!name.trim())return fail("Enter your name first.");
+  const c=Array.from({length:4},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.floor(Math.random()*24)]).join("");
+  try{await db.doc("rooms/"+c).set({host:uid,phase:"lobby",game:0,round:1,turn:0,order:[],used:[],at:Date.now()});await join(c)}catch(e){fail("Could not create the room.")}
+}
+async function join(c,quiet){
+  c=c.toUpperCase().trim();
+  if(!name.trim())return fail("Enter your name first.");
+  try{
+    const s=await db.doc("rooms/"+c).get();
+    if(!s.exists){if(quiet)ls.set("imp-code","");else fail("Room not found. Check the code.");return}
+    const pd=db.doc(`rooms/${c}/players/${uid}`),ps=await pd.get();
+    if(ps.exists)await pd.update({name:name.trim().slice(0,16)});else await pd.set({name:name.trim().slice(0,16),at:Date.now()});
+    ls.set("imp-name",name.trim());ls.set("imp-code",c);code=c;err="";subscribe();
+  }catch(e){fail("Could not join the room.")}
+}
+function subscribe(){
+  unsubs.push(rdoc().onSnapshot(s=>{R=s.exists?s.data():null;tick()}));
+  unsubs.push(db.collection(`rooms/${code}/players`).onSnapshot(q=>{P={};q.docs.forEach(d=>P[d.id]=d.data());tick()}));
+}
+function leave(){
+  unsubs.forEach(u=>u());unsubs=[];
+  if(R&&(R.phase==="lobby"||R.phase==="result"))me().delete().catch(()=>{});
+  code=null;R=null;P={};lastKey="";ls.set("imp-code","");render();
+}
+function fail(m){err=m;render()}
+
+function tick(){if(R&&R.host===uid)hostStep();render()}
+function hostStep(){
+  const k=key(),kk=[k,R.phase,R.turn].join();
+  if(kk===lastKey)return;
+  if(R.phase==="hints"){
+    const c=R.order[R.turn];
+    if(P[c]&&P[c]["h"+k]!==undefined){lastKey=kk;rdoc().update(R.turn+1<R.order.length?{turn:R.turn+1,deadline:Date.now()+HINT_MS}:{phase:"vote",deadline:Date.now()+VOTE_MS})}
+  }else if(R.phase==="vote"&&R.order.every(i=>P[i]&&P[i]["v"+k]!==undefined)){
+    lastKey=kk;
+    const c={};let skip=0;
+    R.order.forEach(i=>{const v=P[i]["v"+k];if(v==="skip")skip++;else c[v]=(c[v]||0)+1});
+    const top=Object.entries(c).sort((a,b)=>b[1]-a[1]),[tid,tn]=top[0]||[];
+    if(!tid||skip>=tn||(top[1]&&top[1][1]===tn))rdoc().update({round:R.round+1,turn:0,phase:"hints",deadline:Date.now()+HINT_MS,note:"No majority, so the vote was skipped. Give another hint."});
+    else rdoc().update({phase:"result",accused:tid,winner:tid===R.imp?"crew":"imposter"});
+  }
+}
+async function startGame(){
+  const ids=Object.keys(P);if(ids.length<3||starting)return;
+  starting=true;render();
+  const pair=await makePair();
+  await rdoc().update({phase:"hints",deadline:Date.now()+HINT_MS,game:R.game+1,round:1,turn:0,order:shuffle(ids),imp:pick(ids),civ:pair[0],impw:pair[1],used:[...(R.used||[]).slice(-40),pair.join("/")],note:"",accused:"",winner:""});
+  starting=false;
+}
+
+function role(){
+  const imp=uid===R.imp;
+  return `<div class="card ${imp?"imp":"word"}"><p>${imp?"You are the imposter":"Your word"}</p><div class="big">${esc(imp?R.impw:R.civ)}</div>${imp?"<p>Your word is close to theirs. Blend in and don’t get caught.</p>":""}</div>`;
+}
+function hints(){
+  let h="";
+  for(let r=1;r<=R.round;r++){
+    const rows=R.order.map(i=>{const t=P[i]&&P[i]["h"+R.game+"_"+r];return t===undefined?"":`<div class="hl"><b>${esc(nm(i))}</b><span>${esc(t)}</span></div>`}).join("");
+    if(rows)h+=`<div class="rd"><p>Round ${r}</p>${rows}</div>`;
+  }
+  return h;
+}
+
+function render(){
+  const f=document.activeElement&&document.activeElement.id,pos=f&&document.activeElement.selectionStart;
+  $.innerHTML=body();
+  if(f){const el=document.getElementById(f);if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(e){}}}
+}
+function body(){
+  const e=err?`<p class="err">${esc(err)}</p>`:"";
+  if(!ready)return `<h1>Imposter</h1><p>Connecting… If this stays here, check your internet and reload.</p>`;
+  if(!code||!R)return `<h1>Imposter</h1><p>Play with friends on their own phones. Create a room and share the code.</p>
+  <input id="name" placeholder="Your name" maxlength="16" value="${esc(name)}" autocomplete="off">
+  <button class="main" data-act="create">Create room</button>
+  <input id="codein" placeholder="Room code" maxlength="4" value="${esc(codeIn)}" autocomplete="off" autocapitalize="characters">
+  <button class="ghost" data-act="join">Join room</button>${e}`;
+  const ids=Object.keys(P).sort((a,b)=>P[a].at-P[b].at),isHost=R.host===uid,out=`<button class="ghost" data-act="leave">Leave room</button>`;
+  if(R.phase==="lobby")return `<div class="card"><p>Room code</p><div class="code">${code}</div><p>Friends open the same link and join with this code.</p></div>
+  <div class="list">${ids.map(i=>`<div class="pl"><b>${esc(nm(i))}${i===uid?" (you)":""}</b>${isHost&&i!==uid?`<button class="ghost x" data-act="kick" data-id="${i}" aria-label="Remove ${esc(nm(i))}">Remove</button>`:""}</div>`).join("")}</div>
+  <div class="spacer"></div>${isHost?`<button class="main" data-act="start" ${ids.length<3||starting?"disabled":""}>${starting?"Picking words…":ids.length<3?"Need 3 players to start":"Start game"}</button>`:`<p>Waiting for ${esc(nm(R.host))} to start.</p>`}${e}${out}`;
+  const inGame=R.order.includes(uid),k=key();
+  if(!inGame)return `<div class="card"><p>A game is in progress</p><div class="big">You’ll join the next one</div></div>${out}`;
+  if(R.phase==="hints"){
+    const cur=R.order[R.turn],mine=cur===uid;
+    return `${timer()}${role()}${R.note?`<p>${esc(R.note)}</p>`:""}${hints()}<div class="spacer"></div>
+    ${mine?`<p>Your turn. Give a hint for your word.</p><input id="draft" placeholder="Your hint" maxlength="40" value="${esc(draft)}" autocomplete="off"><button class="main" data-act="hint">Send hint</button>`:`<p>Waiting for ${esc(nm(cur))}…</p>`}${out}`;
+  }
+  if(R.phase==="vote"){
+    const mine=P[uid]&&P[uid]["v"+k],n=R.order.filter(i=>P[i]&&P[i]["v"+k]!==undefined).length;
+    return `${timer()}${role()}${hints()}<div class="spacer"></div>${mine!==undefined?`<p>Vote sent. Waiting for others (${n}/${R.order.length}).</p>`:`<p>Who is the imposter? Most votes decides.</p>
+    <div class="list">${R.order.filter(i=>i!==uid).map(i=>`<button class="ghost" data-act="vote" data-id="${i}">${esc(nm(i))}</button>`).join("")}<button data-act="vote" data-id="skip">Skip vote</button></div>`}${out}`;
+  }
+  const won=R.winner==="crew";
+  return `<div class="card ${won?"word":"imp"}"><p>${won?"Crew wins":"Imposter wins"}</p><div class="big">${esc(nm(R.accused))} was voted out</div><p>${won?"They were the imposter.":`The real imposter was ${esc(nm(R.imp))}.`}</p></div>
+  <div class="hl"><b>Everyone else</b><span>${esc(R.civ)}</span></div><div class="hl"><b>Imposter</b><span>${esc(R.impw)}</span></div>
+  <div class="spacer"></div>${isHost?`<button class="main" data-act="start" ${starting?"disabled":""}>${starting?"Picking words…":"Play again"}</button>`:`<p>Waiting for ${esc(nm(R.host))} to start the next game.</p>`}${out}`;
+}
+
+$.addEventListener("click",async ev=>{
+  const b=ev.target.closest("button");if(!b)return;const a=b.dataset.act;
+  try{
+    if(a==="create")create();
+    else if(a==="join")join(codeIn);
+    else if(a==="leave")leave();
+    else if(a==="start")startGame();
+    else if(a==="kick")db.doc(`rooms/${code}/players/${b.dataset.id}`).delete();
+    else if(a==="hint"){const t=draft.trim();if(!t)return;draft="";await me().update({["h"+key()]:t.slice(0,40)})}
+    else if(a==="vote")await me().update({["v"+key()]:b.dataset.id});
+  }catch(e){fail("That didn’t go through. Try again.")}
+});
+$.addEventListener("input",ev=>{
+  const t=ev.target;
+  if(t.id==="name")name=t.value;
+  else if(t.id==="codein"){codeIn=t.value.toUpperCase();t.value=codeIn}
+  else if(t.id==="draft")draft=t.value;
+});
+</script>
+</body>
+</html>
