@@ -71,7 +71,7 @@ const askAI=async p=>{
     try{
       const r=await Promise.race([getGenerativeModel(ai,{model:MODELS[m]}).generateContent(p),new Promise((_,j)=>setTimeout(()=>j(new Error("timeout")),10000))]);
       mi=m;aiErr="";return r.response.text().trim();
-    }catch(e){aiErr=`${MODELS[m]}: ${String(e&&e.message||e).slice(0,90)}`}
+    }catch(e){if(n===0)aiErr=`${MODELS[m]}: ${String(e&&e.message||e).slice(0,300)}`}
   }
   return null;
 };
@@ -107,6 +107,18 @@ const H={};"Coffee|hot dark morning drink|subah ki garam kaali cheez;Tea|hot dri
 const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
 let botK="",bv={};
 const isBot=i=>!!(P[i]&&P[i].bot);
+const HINTQ="\nGive your hint for your word now: 2 to 7 words, casual, never say the word itself, and different from every hint already given. Use English or Roman Urdu. Output only the hint.";
+function fbHint(w){
+  const used=[];R.order.forEach(i=>{for(let r=1;r<=R.round;r++){const t=P[i]&&P[i]["h"+R.game+"_"+r];if(t)used.push(t.toLowerCase())}});
+  const h=H[w.toLowerCase()],n=w.replace(/\s/g,"").length,c=w[0].toUpperCase();
+  const pool=[...(h||[]),`Starts with ${c}`,`Iska pehla harf ${c} hai`,`It has ${n} letters`,`Isme ${n} harf hain`,`Ends with “${w.slice(-1)}”`].filter(t=>!used.includes(t.toLowerCase()));
+  return pick(pool.length?pool:["Mujhe aur kuch nahi sujh raha"]);
+}
+function fallbackLine(b){
+  const k=key(),o=pick(R.order.filter(i=>i!==b)),oh=P[o]&&P[o]["h"+R.game+"_"+R.round],used=chat.filter(x=>x.k===k).map(x=>x.m);
+  const L=[`${nm(o)}, tumhara hint thoda vague tha`,`I’m not sure about ${nm(o)}.`,`${nm(o)} ka hint mujhe ajeeb laga`,`Hmm ${nm(o)}, can you explain your hint?`,oh?`“${oh}” kitna specific hai?`:"",`Mujhe lagta hai ${nm(o)} bluff kar raha hai`,"Let’s not rush. Sab ke hints dobara dekho.",`Honestly ${nm(o)} sounds suspicious to me.`,"Kisi aur ko bhi shak hai?",`${nm(o)}, tum kya soch rahe ho?`].filter(t=>t&&!used.includes(t));
+  return pick(L.length?L:["Hmm…"]);
+}
 const LINES=["Hmm, kiska hint thoda ajeeb tha?","Someone’s hint felt a bit off to me.","Hints ko dhyan se dekho, koi vague hai.","Who was the most vague one?"];
 const CHATQ="\nWrite your next chat message: one short casual sentence (max 20 words), like a friend texting. Match the language the other players use (English or Roman Urdu); if nobody has spoken, mix Roman Urdu and English. Never say you are an AI. Output only the message.";
 function botStep(){
@@ -115,8 +127,13 @@ function botStep(){
     const b=R.order[R.turn];
     if(!isBot(b)||P[b]["h"+k]!==undefined)return;
     const bk=k+"_"+R.turn;if(bk===botK)return;botK=bk;
-    const w=R.imp===b?R.impw:R.civ,h=H[String(w).toLowerCase()],t=h?h[(R.round+R.game+R.turn)%2]:"I can’t say much about it";
-    setTimeout(()=>db.doc(`rooms/${code}/players/${b}`).update({["h"+k]:cap(t)}).catch(()=>{}),3000);
+    const w=String(R.imp===b?R.impw:R.civ);
+    setTimeout(async()=>{
+      let t=await askAI(ctx(b)+HINTQ);
+      if(t){t=t.replace(/^"|"$/g,"").slice(0,60);if(t.toLowerCase().includes(w.toLowerCase()))t=""}
+      if(!t)t=fbHint(w);
+      db.doc(`rooms/${code}/players/${b}`).update({["h"+k]:cap(t)}).catch(()=>{});
+    },2500);
   }else if(R.phase==="vote")R.order.filter(isBot).forEach(b=>botVote(b,k));
 }
 const nmb=(i,b)=>i===b?`${nm(i)} (you)`:nm(i);
@@ -137,7 +154,7 @@ async function botVote(b,k){
   const msgs=chat.filter(x=>x.k===k&&x.u!==b).length;
   if(s.sent<4&&now>=s.next&&(msgs>s.seen||s.sent===0||now-s.last>40000)){
     s.busy=true;s.seen=msgs;
-    const t=((await askAI(ctx(b)+CHATQ))||pick(LINES)).replace(/^"|"$/g,"").slice(0,120);
+    const t=((await askAI(ctx(b)+CHATQ))||fallbackLine(b)).replace(/^"|"$/g,"").slice(0,120);
     if(code&&R&&R.phase==="vote"&&key()===k)await db.doc(`rooms/${code}/chat/${Date.now()}_${b}`).set({u:b,m:t,t:Date.now(),k}).catch(()=>{});
     s.sent++;s.last=Date.now();s.next=s.last+8000+Math.random()*8000;s.busy=false;
   }
@@ -252,7 +269,7 @@ function hints(){
 }
 
 const COL=["#FFC93C","#FF8FA3","#8FD3FF","#B8F2A0","#D5B3FF","#FFB27A"];
-const logo=()=>`<div class="logo"><i aria-hidden="true">🕵️ 🔍 ❓</i><b>Clue Rush</b><span>Give clues. Find the imposter. <small style="opacity:.55">v7</small></span></div>`;
+const logo=()=>`<div class="logo"><i aria-hidden="true">🕵️ 🔍 ❓</i><b>Clue Rush</b><span>Give clues. Find the imposter. <small style="opacity:.55">v8</small></span></div>`;
 function render(){
   const f=document.activeElement&&document.activeElement.id,pos=f&&document.activeElement.selectionStart;
   $.innerHTML=body();
