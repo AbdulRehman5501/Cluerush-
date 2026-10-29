@@ -14,7 +14,8 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:radial-gradient(circle at 12% 0%,color-mix(in srgb,var(--pink) 22%,transparent),transparent 45%),radial-gradient(circle at 95% 10%,color-mix(in srgb,var(--sun) 26%,transparent),transparent 42%),var(--bg) fixed;color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:500;line-height:1.4}
 #app{max-width:480px;margin:0 auto;padding:20px 20px 32px;min-height:100dvh;display:flex;flex-direction:column;gap:14px}
 h1{font-size:3.2rem;line-height:.95;margin:12px 0 0;font-weight:800;letter-spacing:-.03em}
-p{margin:0;color:var(--muted)}
+p{margin:0;color:var(--muted);overflow-wrap:anywhere}
+.hl b,.hl span{overflow-wrap:anywhere;min-width:0}
 button{font:inherit;font-weight:700;border:0;border-radius:16px;padding:14px 18px;background:var(--ink);color:var(--bg);cursor:pointer;min-height:50px}
 button:disabled{opacity:.4}
 button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
@@ -269,7 +270,7 @@ function hints(){
 }
 
 const COL=["#FFC93C","#FF8FA3","#8FD3FF","#B8F2A0","#D5B3FF","#FFB27A"];
-const logo=()=>`<div class="logo"><i aria-hidden="true">🕵️ 🔍 ❓</i><b>Clue Rush</b><span>Give clues. Find the imposter. <small style="opacity:.55">v8</small></span></div>`;
+const logo=()=>`<div class="logo"><i aria-hidden="true">🕵️ 🔍 ❓</i><b>Clue Rush</b><span>Give clues. Find the imposter. <small style="opacity:.55">v9</small></span></div>`;
 function render(){
   const f=document.activeElement&&document.activeElement.id,pos=f&&document.activeElement.selectionStart;
   $.innerHTML=body();
