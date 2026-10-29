@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Imposter Online</title>
+<title>Clue Rush</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#F3EFFF;--ink:#1E1B3A;--card:#FFFFFF;--muted:#6B6890;--pink:#FF5C7A;--sun:#FFC93C;--line:#D9D3F5;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -33,6 +33,10 @@ input{font:inherit;width:100%;padding:13px 14px;border-radius:14px;border:2px so
 .spacer{flex:1}
 .err{color:var(--pink);font-weight:700}
 .x{min-height:36px;padding:4px 12px}
+.logo{text-align:center;padding:14px 0 6px}
+.logo i{font-style:normal;font-size:2.2rem;display:block;letter-spacing:.3em}
+.logo b{display:block;font-size:3.6rem;font-weight:800;letter-spacing:-.03em;line-height:.95;background:linear-gradient(90deg,var(--pink),var(--sun));-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo span{display:block;color:var(--muted);margin-top:8px}
 .tm{text-align:center;font-size:1.1rem}.tm b{font-size:1.6rem;color:var(--pink)}
 </style>
 </head>
@@ -42,14 +46,14 @@ input{font:inherit;width:100%;padding:13px 14px;border-radius:14px;border:2px so
 import {initializeApp} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import {getAuth,signInAnonymously} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {getAI,getGenerativeModel,GoogleAIBackend} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-ai.js";
-import {initializeAppCheck,ReCaptchaV3Provider} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app-check.js";
+import {initializeAppCheck,ReCaptchaEnterpriseProvider} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app-check.js";
 import {getFirestore,serverTimestamp,doc,collection,getDoc,setDoc,updateDoc,deleteDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 const app=initializeApp({apiKey:"AIzaSyDHcp44KXR6Gax_Vf3fwdinWBgJB4l_92Y",authDomain:"clue-rush-a7bbe.firebaseapp.com",projectId:"clue-rush-a7bbe",storageBucket:"clue-rush-a7bbe.firebasestorage.app",messagingSenderId:"439710542707",appId:"1:439710542707:web:b55e0a8f2c309b86e8b306"});
 const auth=getAuth(app),fs=getFirestore(app);
-const SITE_KEY="PASTE_SITE_KEY_HERE",MODEL="gemini-3-flash-preview";
+const SITE_KEY="6LdJCwYuAAAAAKGlcnkpzw6sLXzyAl5U75qzLV-c",MODEL="gemini-3-flash-preview";
 let model=null;
 try{
-  if(!SITE_KEY.startsWith("PASTE"))initializeAppCheck(app,{provider:new ReCaptchaV3Provider(SITE_KEY),isTokenAutoRefreshEnabled:true});
+  if(!SITE_KEY.startsWith("PASTE"))initializeAppCheck(app,{provider:new ReCaptchaEnterpriseProvider(SITE_KEY),isTokenAutoRefreshEnabled:true});
   model=getGenerativeModel(getAI(app,{backend:new GoogleAIBackend()}),{model:MODEL});
 }catch(e){}
 const askAI=async p=>{if(!model)return null;try{const r=await Promise.race([model.generateContent(p),new Promise((_,j)=>setTimeout(j,15000))]);return r.response.text().trim()}catch(e){return null}};
@@ -229,6 +233,7 @@ function hints(){
   return h;
 }
 
+const logo=()=>`<div class="logo"><i aria-hidden="true">🕵️ 🔍 ❓</i><b>Clue Rush</b><span>Give clues. Find the imposter.</span></div>`;
 function render(){
   const f=document.activeElement&&document.activeElement.id,pos=f&&document.activeElement.selectionStart;
   $.innerHTML=body();
@@ -236,14 +241,14 @@ function render(){
 }
 function body(){
   const e=err?`<p class="err">${esc(err)}</p>`:"";
-  if(!ready)return `<h1>Imposter</h1><p>Connecting… If this stays here, check your internet and reload.</p>`;
-  if(!code||!R)return `<h1>Imposter</h1><p>Play with friends on their own phones. Create a room and share the code.</p>
+  if(!ready)return `${logo()}<p>Connecting… If this stays here, check your internet and reload.</p>`;
+  if(!code||!R)return `${logo()}<p>Play with friends on their own phones. Create a room and share the code.</p>
   <input id="name" placeholder="Your name" maxlength="16" value="${esc(name)}" autocomplete="off">
   <button class="main" data-act="create">Create room</button>
   <input id="codein" placeholder="Room code" maxlength="4" value="${esc(codeIn)}" autocomplete="off" autocapitalize="characters">
   <button class="ghost" data-act="join">Join room</button>${e}`;
   const ids=Object.keys(P).sort((a,b)=>P[a].at-P[b].at),isHost=isLead(),out=`<button class="ghost" data-act="leave">Leave room</button>`;
-  if(R.phase==="lobby")return `<div class="card"><p>Room code</p><div class="code">${code}</div><p>Friends open the same link and join with this code.</p></div>
+  if(R.phase==="lobby")return `${logo()}<div class="card"><p>Room code</p><div class="code">${code}</div><p>Friends open the same link and join with this code.</p></div>
   <div class="list">${ids.map(i=>`<div class="pl"><b>${esc(nm(i))}${i===uid?" (you)":""}</b>${isHost&&i!==uid?`<button class="ghost x" data-act="kick" data-id="${i}" aria-label="Remove ${esc(nm(i))}">Remove</button>`:""}</div>`).join("")}</div>
   <div class="spacer"></div>${isHost?`<div style="display:flex;gap:8px"><button class="ghost" data-act="addbot" style="flex:1">Add robot 🤖</button>${ids.some(i=>P[i].bot)?`<button class="ghost" data-act="rmbot" style="flex:1">Remove robot</button>`:""}</div><button class="main" data-act="start" ${ids.length<3||starting?"disabled":""}>${starting?"Picking words…":ids.length<3?"Need 3 players to start":"Start game"}</button>`:`<p>Waiting for ${esc(nm(lead()))} to start.</p>`}${e}${out}`;
   const inGame=R.order.includes(uid),k=key();
