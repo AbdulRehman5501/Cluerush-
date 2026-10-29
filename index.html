@@ -11,7 +11,7 @@
 :root[data-theme="dark"]{--bg:#17152B;--ink:#F1EEFF;--card:#25223F;--muted:#A19DC9;--line:#3A3660;color-scheme:dark}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:500;line-height:1.4}
+body{margin:0;background:radial-gradient(circle at 12% 0%,color-mix(in srgb,var(--pink) 22%,transparent),transparent 45%),radial-gradient(circle at 95% 10%,color-mix(in srgb,var(--sun) 26%,transparent),transparent 42%),var(--bg) fixed;color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:500;line-height:1.4}
 #app{max-width:480px;margin:0 auto;padding:20px 20px 32px;min-height:100dvh;display:flex;flex-direction:column;gap:14px}
 h1{font-size:3.2rem;line-height:.95;margin:12px 0 0;font-weight:800;letter-spacing:-.03em}
 p{margin:0;color:var(--muted)}
@@ -37,6 +37,13 @@ input{font:inherit;width:100%;padding:13px 14px;border-radius:14px;border:2px so
 .logo i{font-style:normal;font-size:2.2rem;display:block;letter-spacing:.3em}
 .logo b{display:block;font-size:3.6rem;font-weight:800;letter-spacing:-.03em;line-height:.95;background:linear-gradient(90deg,var(--pink),var(--sun));-webkit-background-clip:text;background-clip:text;color:transparent}
 .logo span{display:block;color:var(--muted);margin-top:8px}
+.ticket{position:relative;background:var(--card);border:3px dashed var(--pink);border-radius:24px;padding:20px;text-align:center}
+.ticket p{font-size:.85rem;letter-spacing:.2em;text-transform:uppercase}
+.ticket .code{color:var(--pink);margin:2px 0}
+.av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#1E1B3A;flex:none}
+.wait{text-align:center}
+.wait .d{display:inline-block;margin:0 2px}
+@media (prefers-reduced-motion:no-preference){.wait .d{animation:hop 1.2s infinite}.wait .d:nth-of-type(2){animation-delay:.2s}.wait .d:nth-of-type(3){animation-delay:.4s}@keyframes hop{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}}
 .tm{text-align:center;font-size:1.1rem}.tm b{font-size:1.6rem;color:var(--pink)}
 </style>
 </head>
@@ -50,13 +57,24 @@ import {initializeAppCheck,ReCaptchaEnterpriseProvider} from "https://www.gstati
 import {getFirestore,serverTimestamp,doc,collection,getDoc,setDoc,updateDoc,deleteDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 const app=initializeApp({apiKey:"AIzaSyDHcp44KXR6Gax_Vf3fwdinWBgJB4l_92Y",authDomain:"clue-rush-a7bbe.firebaseapp.com",projectId:"clue-rush-a7bbe",storageBucket:"clue-rush-a7bbe.firebasestorage.app",messagingSenderId:"439710542707",appId:"1:439710542707:web:b55e0a8f2c309b86e8b306"});
 const auth=getAuth(app),fs=getFirestore(app);
-const SITE_KEY="6LdJCwYuAAAAAKGlcnkpzw6sLXzyAl5U75qzLV-c",MODEL="gemini-3-flash-preview";
-let model=null;
+const SITE_KEY="6LdJCwYuAAAAAKGlcnkpzw6sLXzyAl5U75qzLV-c";
+const MODELS=["gemini-3-flash-preview","gemini-2.5-flash","gemini-2.0-flash"];
+let ai=null,mi=0,aiErr="";
 try{
   if(!SITE_KEY.startsWith("PASTE"))initializeAppCheck(app,{provider:new ReCaptchaEnterpriseProvider(SITE_KEY),isTokenAutoRefreshEnabled:true});
-  model=getGenerativeModel(getAI(app,{backend:new GoogleAIBackend()}),{model:MODEL});
-}catch(e){}
-const askAI=async p=>{if(!model)return null;try{const r=await Promise.race([model.generateContent(p),new Promise((_,j)=>setTimeout(j,15000))]);return r.response.text().trim()}catch(e){return null}};
+  ai=getAI(app,{backend:new GoogleAIBackend()});
+}catch(e){aiErr=String(e&&e.message||e).slice(0,90)}
+const askAI=async p=>{
+  if(!ai)return null;
+  for(let n=0;n<MODELS.length;n++){
+    const m=(mi+n)%MODELS.length;
+    try{
+      const r=await Promise.race([getGenerativeModel(ai,{model:MODELS[m]}).generateContent(p),new Promise((_,j)=>setTimeout(()=>j(new Error("timeout")),10000))]);
+      mi=m;aiErr="";return r.response.text().trim();
+    }catch(e){aiErr=`${MODELS[m]}: ${String(e&&e.message||e).slice(0,90)}`}
+  }
+  return null;
+};
 const snap=s=>({exists:s.exists(),data:()=>s.data({serverTimestamps:"estimate"})});
 const makeDb=()=>({
   doc:p=>{const r=doc(fs,p);return{get:async()=>snap(await getDoc(r)),set:d=>setDoc(r,d),update:d=>updateDoc(r,d),delete:()=>deleteDoc(r),onSnapshot:cb=>onSnapshot(r,x=>cb(snap(x)))}},
@@ -133,7 +151,7 @@ async function castVote(b,k){
 }
 setInterval(()=>{if(R&&code&&isLead()&&R.phase==="vote")botStep()},2500);
 
-function chatUI(){const m=chat.filter(x=>x.k===key());return `<div class="rd"><p>Chat</p>${m.map(x=>`<div class="hl"><b>${esc(nm(x.u))}</b><span>${esc(x.m)}</span></div>`).join("")}<div style="display:flex;gap:8px"><input id="cdraft" placeholder="Say something…" maxlength="120" value="${esc(cdraft)}" autocomplete="off"><button data-act="chat">Send</button></div></div>`}
+function chatUI(){const m=chat.filter(x=>x.k===key());return `<div class="rd"><p>Chat${aiErr?` (AI off: ${esc(aiErr)})`:""}</p>${m.map(x=>`<div class="hl"><b>${esc(nm(x.u))}</b><span>${esc(x.m)}</span></div>`).join("")}<div style="display:flex;gap:8px"><input id="cdraft" placeholder="Say something…" maxlength="120" value="${esc(cdraft)}" autocomplete="off"><button data-act="chat">Send</button></div></div>`}
 const HINT_MS=90000,VOTE_MS=120000;
 const left=()=>R&&R.deadline?Math.max(0,Math.ceil((R.deadline-sNow())/1000)):0;
 const fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
@@ -233,6 +251,7 @@ function hints(){
   return h;
 }
 
+const COL=["#FFC93C","#FF8FA3","#8FD3FF","#B8F2A0","#D5B3FF","#FFB27A"];
 const logo=()=>`<div class="logo"><i aria-hidden="true">🕵️ 🔍 ❓</i><b>Clue Rush</b><span>Give clues. Find the imposter.</span></div>`;
 function render(){
   const f=document.activeElement&&document.activeElement.id,pos=f&&document.activeElement.selectionStart;
@@ -248,9 +267,9 @@ function body(){
   <input id="codein" placeholder="Room code" maxlength="4" value="${esc(codeIn)}" autocomplete="off" autocapitalize="characters">
   <button class="ghost" data-act="join">Join room</button>${e}`;
   const ids=Object.keys(P).sort((a,b)=>P[a].at-P[b].at),isHost=isLead(),out=`<button class="ghost" data-act="leave">Leave room</button>`;
-  if(R.phase==="lobby")return `${logo()}<div class="card"><p>Room code</p><div class="code">${code}</div><p>Friends open the same link and join with this code.</p></div>
-  <div class="list">${ids.map(i=>`<div class="pl"><b>${esc(nm(i))}${i===uid?" (you)":""}</b>${isHost&&i!==uid?`<button class="ghost x" data-act="kick" data-id="${i}" aria-label="Remove ${esc(nm(i))}">Remove</button>`:""}</div>`).join("")}</div>
-  <div class="spacer"></div>${isHost?`<div style="display:flex;gap:8px"><button class="ghost" data-act="addbot" style="flex:1">Add robot 🤖</button>${ids.some(i=>P[i].bot)?`<button class="ghost" data-act="rmbot" style="flex:1">Remove robot</button>`:""}</div><button class="main" data-act="start" ${ids.length<3||starting?"disabled":""}>${starting?"Picking words…":ids.length<3?"Need 3 players to start":"Start game"}</button>`:`<p>Waiting for ${esc(nm(lead()))} to start.</p>`}${e}${out}`;
+  if(R.phase==="lobby")return `${logo()}<div class="ticket"><p>Room code</p><div class="code">${code}</div><p style="letter-spacing:0;text-transform:none;font-size:.95rem">Friends open the same link and join with this code.</p></div><button class="ghost" data-act="share">Share code</button>
+  <div class="list">${ids.map((i,x)=>`<div class="pl"><span style="display:flex;align-items:center;gap:10px"><span class="av" style="background:${COL[x%COL.length]}">${esc(nm(i).charAt(0).toUpperCase())}</span><b>${esc(nm(i))}${i===uid?" (you)":""}${P[i].bot?" 🤖":""}</b></span>${isHost&&i!==uid?`<button class="ghost x" data-act="kick" data-id="${i}" aria-label="Remove ${esc(nm(i))}">Remove</button>`:""}</div>`).join("")}</div>
+  <p class="wait">${ids.length} in the room · waiting for players <span class="d">•</span><span class="d">•</span><span class="d">•</span></p><div class="spacer"></div>${isHost?`<div style="display:flex;gap:8px"><button class="ghost" data-act="addbot" style="flex:1">Add robot 🤖</button>${ids.some(i=>P[i].bot)?`<button class="ghost" data-act="rmbot" style="flex:1">Remove robot</button>`:""}</div><button class="main" data-act="start" ${ids.length<3||starting?"disabled":""}>${starting?"Picking words…":ids.length<3?"Need 3 players to start":"Start game"}</button>`:`<p>Waiting for ${esc(nm(lead()))} to start.</p>`}${e}${out}`;
   const inGame=R.order.includes(uid),k=key();
   if(!inGame)return `<div class="card"><p>A game is in progress</p><div class="big">You’ll join the next one</div></div>${out}`;
   if(R.phase==="hints"){
@@ -279,6 +298,7 @@ $.addEventListener("click",async ev=>{
     else if(a==="kick")db.doc(`rooms/${code}/players/${b.dataset.id}`).delete();
     else if(a==="hint"){const t=draft.trim();if(!t)return;draft="";await me().update({["h"+key()]:t.slice(0,40)})}
     else if(a==="chat"){const t=cdraft.trim();if(!t)return;cdraft="";await db.doc(`rooms/${code}/chat/${Date.now()}_${uid}`).set({u:uid,m:t.slice(0,120),t:Date.now(),k:key()})}
+    else if(a==="share"){const t=`Join my Clue Rush game! Room code: ${code}\n${location.href}`;if(navigator.share)navigator.share({text:t}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(t).catch(()=>{})}
     else if(a==="addbot"){const ks=Object.keys(P);let n=1;while(P["robot"+n])n++;if(n<=6&&ks.length<12)await db.doc(`rooms/${code}/players/robot${n}`).set({name:`Robot ${n}`,bot:true,at:Date.now()})}
     else if(a==="rmbot"){const bs=Object.keys(P).filter(i=>P[i].bot).sort();if(bs.length)await db.doc(`rooms/${code}/players/${bs[bs.length-1]}`).delete()}
     else if(a==="vote")await me().update({["v"+key()]:b.dataset.id});
