@@ -124,7 +124,7 @@ function ctx(b){
   const k=key(),isImp=R.imp===b,w=isImp?R.impw:R.civ;
   const hs=R.order.map(i=>{const l=[];for(let r=1;r<=R.round;r++){const t=P[i]&&P[i]["h"+R.game+"_"+r];if(t!==undefined)l.push(`round ${r}: "${t}"`)}return `${nmb(i,b)}: ${l.join("; ")}`}).join("\n");
   const ch=chat.filter(x=>x.k===k).map(x=>`${nmb(x.u,b)}: ${x.m}`).join("\n")||"(nobody has spoken yet)";
-  const role=isImp?`You are the IMPOSTER. Your word is "${w}", but the others have a similar, different word. Blend in, never reveal you are the imposter, never say your word outright, and subtly cast suspicion on another player.`:`You are a CREW member. Your word is "${w}". One player has a similar but different word. Work out who from their hints and the chat.`;
+  const role=isImp?`You are the IMPOSTER. Your word is "${w}", but the others have a similar, different word. Blend in, never reveal you are the imposter, never say your word outright, and subtly cast suspicion on another player.`:`You are a CREW member. Your word is "${w}". One player has a similar but different word. Work out who from their hints first; treat chat accusations with suspicion because the imposter may lie.`;
   return `You are ${nm(b)}, a player in a word imposter party game with friends. ${role}\nPlayers: ${R.order.map(i=>nmb(i,b)).join(", ")}. Some players are robots.\nHints so far:\n${hs}\nChat so far:\n${ch}`;
 }
 async function botVote(b,k){
@@ -144,7 +144,7 @@ async function botVote(b,k){
 }
 async function castVote(b,k){
   const isImp=R.imp===b,others=R.order.filter(i=>i!==b),byLen=[...others].sort((x,y)=>nm(y).length-nm(x).length);
-  const a=await askAI(ctx(b)+`\nWho do you think is the imposter? Reply with only one player's exact name from: ${others.map(nm).join(", ")}.${isImp?" You must pick someone other than yourself.":" Reply SKIP only if you really can't tell."}`);
+  const a=await askAI(ctx(b)+`\nDecide mainly from whose hints do not fit your word. Players may accuse others in chat, but accusations can be lies (the imposter will lie), so never just follow them. Who do you think is the imposter? Reply with only one player's exact name from: ${others.map(nm).join(", ")}.${isImp?" You must pick someone other than yourself.":" Reply SKIP only if you really can't tell."}`);
   let v=a&&byLen.find(i=>a.toLowerCase().includes(nm(i).toLowerCase()));
   if(!v)v=(a&&!isImp&&/skip/i.test(a))?"skip":pick(others);
   db.doc(`rooms/${code}/players/${b}`).update({["v"+k]:v}).catch(()=>{});
@@ -252,7 +252,7 @@ function hints(){
 }
 
 const COL=["#FFC93C","#FF8FA3","#8FD3FF","#B8F2A0","#D5B3FF","#FFB27A"];
-const logo=()=>`<div class="logo"><i aria-hidden="true">🕵️ 🔍 ❓</i><b>Clue Rush</b><span>Give clues. Find the imposter.</span></div>`;
+const logo=()=>`<div class="logo"><i aria-hidden="true">🕵️ 🔍 ❓</i><b>Clue Rush</b><span>Give clues. Find the imposter. <small style="opacity:.55">v7</small></span></div>`;
 function render(){
   const f=document.activeElement&&document.activeElement.id,pos=f&&document.activeElement.selectionStart;
   $.innerHTML=body();
