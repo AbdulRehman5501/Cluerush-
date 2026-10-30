@@ -70,26 +70,28 @@ import {getFirestore,serverTimestamp,doc,collection,getDoc,setDoc,updateDoc,dele
 const app=initializeApp({apiKey:"AIzaSyDHcp44KXR6Gax_Vf3fwdinWBgJB4l_92Y",authDomain:"clue-rush-a7bbe.firebaseapp.com",projectId:"clue-rush-a7bbe",storageBucket:"clue-rush-a7bbe.firebasestorage.app",messagingSenderId:"439710542707",appId:"1:439710542707:web:b55e0a8f2c309b86e8b306"});
 const auth=getAuth(app),fs=getFirestore(app);
 const SITE_KEY="6LdJCwYuAAAAAKGlcnkpzw6sLXzyAl5U75qzLV-c";
-const MODELS=["gemini-3-flash-preview","gemini-2.5-flash","gemini-2.0-flash"];
+const MODELS=["gemini-2.5-flash-lite","gemini-2.5-flash","gemini-3-flash-preview"];
 let ai=null,mi=0,aiErr="";
 try{
   if(!SITE_KEY.startsWith("PASTE"))initializeAppCheck(app,{provider:new ReCaptchaEnterpriseProvider(SITE_KEY),isTokenAutoRefreshEnabled:true});
   ai=getAI(app,{backend:new GoogleAIBackend()});
 }catch(e){aiErr=String(e&&e.message||e).slice(0,90)}
-let aiCool=0,aiPend=0,aiQ=Promise.resolve();
+let aiPend=0,aiQ=Promise.resolve();const cool={},calls=[];
 const askAI=(p,vital=true)=>{
-  if(!ai||Date.now()<aiCool||(!vital&&aiPend>=2))return Promise.resolve(null);
+  const t0=Date.now();while(calls.length&&t0-calls[0]>60000)calls.shift();
+  if(!ai||calls.length>=(vital?9:6)||(!vital&&aiPend>=2))return Promise.resolve(null);
   aiPend++;
   const job=aiQ.then(async()=>{
     for(let n=0;n<MODELS.length;n++){
-      const m=(mi+n)%MODELS.length;
+      const m=(mi+n)%MODELS.length;if((cool[m]||0)>Date.now())continue;
       try{
+        calls.push(Date.now());
         const r=await Promise.race([getGenerativeModel(ai,{model:MODELS[m]}).generateContent(p),new Promise((_,j)=>setTimeout(()=>j(new Error("timeout")),10000))]);
         mi=m;aiErr="";return r.response.text().trim();
       }catch(e){
         const msg=String(e&&e.message||e);
-        if(n===0)aiErr=`${MODELS[m]}: ${msg.slice(0,300)}`;
-        if(/429|quota|rate|exhaust/i.test(msg)){aiCool=Date.now()+20000;break}
+        aiErr=`${MODELS[m]}: ${msg.slice(0,300)}`;
+        if(/429|quota|rate|exhaust/i.test(msg))cool[m]=Date.now()+60000;
       }
     }
     return null;
@@ -390,7 +392,7 @@ const hub=()=>`<div class="studio"><i aria-hidden="true">🪐</i><b>Playverse</b
 <div class="gcard soon"><span class="ic">🧩</span><span><b>Coming soon</b><small>Another game in the works</small></span></div>
 <div class="spacer"></div><p style="text-align:center">© Playverse</p>`;
 const COL=["#FFC93C","#FF8FA3","#8FD3FF","#B8F2A0","#D5B3FF","#FFB27A"];
-const logo=()=>`<div class="logo"><i aria-hidden="true">🕵️ 🔍 ❓</i><b>Clue Rush</b><span>Give clues. Find the imposter. <small style="opacity:.55">v1.4</small></span></div>`;
+const logo=()=>`<div class="logo"><i aria-hidden="true">🕵️ 🔍 ❓</i><b>Clue Rush</b><span>Give clues. Find the imposter. <small style="opacity:.55">v1.5</small></span></div>`;
 function render(){
   const f=document.activeElement&&document.activeElement.id,pos=f&&document.activeElement.selectionStart;
   $.innerHTML=body();
